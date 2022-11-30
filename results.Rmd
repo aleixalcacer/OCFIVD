@@ -1,0 +1,60 @@
+---
+title: "Human Development Index"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+res_df <- readRDS("results_df.rds")
+res_df <- res_df %>% group_by(method, level) %>% summarise(mean=mean(accuracy), sd=sd(accuracy), .groups = "drop")
+
+levels_prev <- c("MAINT", "POLR", "OF")
+levels_prop <- c("MAINT + FH", "KKNN", "KPCAO", "KIOF")
+
+levels <- c(levels_prev, levels_prop)
+
+p <- ggplot(res_df, aes(x = as.factor(level), y = mean, fill=factor(method, levels=levels))) +
+    # ylim(c(0, 1)) +
+    geom_bar(stat = "identity", position = "dodge") +
+      geom_errorbar(aes(ymin=mean+sd, ymax=mean-sd), width=.1,
+                 position=position_dodge(.9))
+
+colors_prev <- rev(c("#132a13","#31572c","#4f772d","#90a955","#ecf39e"))
+colors_prop <- rev(c("#231942","#5e548e","#9f86c0","#be95c4","#e0b1cb"))
+
+colors <- c(
+    colors_prev[1:length(levels_prev)],
+    colors_prop[1:length(levels_prop)]
+    )
+
+p +
+    labs(
+        title = "Interval-data classification using ordinal labels",
+        y = "Model accuracy",
+        x = "Number of groups",
+    ) +
+    theme_classic() +
+    scale_fill_manual(values=colors, name = "Model")
+```
+
+
+```{r}
+
+res_df <- readRDS("results_df.rds")
+
+# ggplot(res_df, aes(y = accuracy, fill=factor(method, levels=levels))) +
+ggplot(res_df, aes(y = accuracy, x = factor(method, levels=levels), fill=factor(method, levels=levels))) +
+    geom_boxplot() +
+    labs(
+        title = "¿?",
+        y = "Model accuracy",
+        x = "Model",
+    ) + 
+#    facet_wrap(~level) +
+    theme_classic() +
+    scale_fill_manual(values=colors, name = "Model")
+```
+

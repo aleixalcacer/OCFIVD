@@ -1,16 +1,23 @@
-require(ordinalForest)
 
-of <- function(data, labels) {
-    data <- data@MidP
-    
-    df <- as_tibble(data) %>% mutate(y = labels)
-    
-    model <- ordinalForest::ordfor("y", df)
-    new_model <- c("model" = list(model))
-    class(new_model) <- "of_"
-    return(new_model)
+require(tidyverse)
+library(stats)
+library(ordinalForest)
+
+of <- function(train, labels) {
+  # Ordinal forest ------
+  et  <- labels
+  db  <- data.frame(et=et, kk=train@MidP)
+  ordforres <- ordfor(depvar="et", data=db)
+  # New model class -----
+  new_model <- c("model"=list(ordforres))
+  class(new_model) <- "OF"
+  return(new_model)
 }
 
-predict.of_ <- function(model, data) {
-    return(predict(model$model, data@MidP))
+predict.OF <- function(model, test) {
+  db <- data.frame(kk=test@MidP)
+  a  <- predict(model$model, db)
+  return(a$ypred)
 }
+
+

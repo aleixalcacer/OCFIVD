@@ -33,14 +33,17 @@ source("methods/maint_fh.R")
 source("methods/kknn.R")
 source("methods/kpcao.R")
 source("methods/polr.R")
+source("methods/of.R")
+source("methods/kiof.R")
 
-levels <- c(3:3)
-iterations <- c(1:1)
-methods <- c("MAINT", "POLR", "MAINT + FH", "KKNN", "KPCAO")
-functions <- c(maint, polr, maint_fh, kknn, kpcao)
+levels <- c(3:7)
+iterations <- c(1:50)
+methods <- c("MAINT", "POLR", "OF", "MAINT + FH", "KKNN", "KPCAO", "KIOF")
+functions <- c(maint, polr, of, maint_fh, kknn, kpcao, kiof)
 
 res <- array(0, dim = c(length(levels), length(iterations), length(methods)), dimnames = list(levels, iterations, methods))
 
+res_df = NULL
 
 for (l in levels) {
     print(l)
@@ -53,11 +56,7 @@ for (l in levels) {
     n_levels <- length(levels(sint.labels))
     sint.labels <- factor(as.numeric(sint.labels), levels = 1:n_levels, order = T)
     
-    m1_acc <- c()
-    m2_acc <- c()
-    m3_acc <- c()
-    m4_acc <- c()
-    m5_acc <- c()
+    
     for (i in iterations) {
         train_id <- sample.int(n = nrow(sint.IData), size = floor(0.8 * nrow(sint.IData)), replace = F)
         
@@ -73,8 +72,10 @@ for (l in levels) {
             cm <- confusionMatrix(model.res, test.labels)
             acc <- cm$overall["Accuracy"]  
             res[as.character(l), as.character(i), methods[j]] <- acc
+            res_df <- bind_rows(res_df, tibble_row("method" = methods[[j]], "level"=l, "iteration"=i, "accuracy"=acc))
         } 
     }
 }
 
 saveRDS(res, "results.rds")
+saveRDS(res_df, "results_df.rds")
