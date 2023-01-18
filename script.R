@@ -35,11 +35,13 @@ source("methods/kpcao.R")
 source("methods/polr.R")
 source("methods/of.R")
 source("methods/kiof.R")
+source("methods/polr_I.R")
+source("methods/polr_I2.R")
 
 levels <- c(3:7)
 iterations <- c(1:50)
-methods <- c("MAINT", "POLR", "OF", "MAINT + FH", "KKNN", "KPCAO", "KIOF")
-functions <- c(maint, polr, of, maint_fh, kknn, kpcao, kiof)
+methods <- c("MAINT", "POLR", "OF", "MAINT + FH", "KKNN", "KPCAO", "KIOF", "POLR_I", "POLR_I2")
+functions <- c(maint, polr, of, maint_fh, kknn, kpcao, kiof, polr_I, polr_I2)
 
 res <- array(0, dim = c(length(levels), length(iterations), length(methods)), dimnames = list(levels, iterations, methods))
 
@@ -67,6 +69,7 @@ for (l in levels) {
         test.labels = sint.labels[-train_id]
         
         for (j in 1:length(methods)) {
+            print(methods[j])
             model <- functions[[j]](train.Idata, train.labels)
             model.res <- predict(model, test.Idata)
             cm <- confusionMatrix(model.res, test.labels)

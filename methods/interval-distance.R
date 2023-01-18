@@ -80,3 +80,25 @@ interval_distance <- function(A, B, distance="hausdorff") {
     }
     distances
 }
+
+
+
+interval_distance_functional <- function(A, B, distance="hausdorff") {
+    d <- NULL
+    if (length(A) != length(B)) {
+        error("length(A) != length(B)")
+    }
+    n_days <- length(A)
+    
+    for (i in 1:n_days) {
+        AA <- A[[i]]
+        BB <- B[[i]]
+        if (is.null(d)) {
+            d <- interval_distance(AA, BB, distance)
+        } else {
+            d <- d + interval_distance(AA, BB, distance)
+        }
+    }
+    
+    return(d)
+}
