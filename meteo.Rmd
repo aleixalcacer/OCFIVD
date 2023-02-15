@@ -1,0 +1,118 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+year <- 2015
+
+estacions <- readxl::read_xlsx("datasets/meteo/Metadades XEMA 2001-01-01_2021-12-31.xlsx")
+estacions <- estacions |>
+    mutate(`Data alta` = as.Date(`Data alta`, format="%d/%m/%Y")) |>
+    mutate(`Data baixa` = as.Date(`Data baixa`, format="%d/%m/%Y")) |>
+    filter((format(`Data alta`, "%Y") < year) & (is.na(`Data baixa`) | (format(`Data baixa`, "%Y") > year)))
+estacions
+```
+
+```{r, warning = FALSE, message = FALSE}
+
+d_year = NULL
+col_names <- c("EMA", "DATA", "TM", "TX", "TN", "HRM", "HRX", "HRN")
+col_types <- c("text", "text",
+               "numeric", "numeric", "date", "numeric", "date",
+               "numeric", "numeric", "date", "numeric", "date",
+               "numeric")
+for (c in estacions$Codi) {
+    
+    path <- paste0("datasets/meteo/Ie_17883_XEMA_2001-2021/Ie_17883_", c, ".xlsx")
+    dades <- readxl::read_excel(path)
+    
+    if (ncol(dades) != 13) {  # Check that data contains all the columns needed
+        print("There aren't 13 columns")
+        next
+    }
+    dades <- readxl::read_excel(path, col_types = col_types)
+ 
+    dades <- dades |>
+        select(EMA, DATA, TM, TX, TN, HRM, HRX, HRN) |>
+        drop_na() |>
+        mutate(DATA = as.Date(DATA, format="%d/%m/%Y")) |>
+        filter(format(DATA, "%Y") == year)
+    
+    if (nrow(dades) != 365) {  # Check that data contains 365 rows
+        print("There aren't 365 days")
+        next
+    }
+    d_year <- bind_rows(d_year, dades)
+}
+```
+
+```{r}
+d_mean <- d_year |>
+    group_by(DATA) |>
+    summarise(
+        TMSD = sd(TM), 
+        TMM = mean(TM),
+        HRMSD = sd(HRM),
+        HRMM = mean(HRM),
+    )
+```
+
+```{r}
+d_standarized <- d_year |>
+    group_by(EMA) |>
+    mutate(
+        TM = (TM - d_mean$TMM) / d_mean$TMSD,
+        TX = (TX - d_mean$TMM) / d_mean$TMSD,
+        TN = (TN - d_mean$TMM) / d_mean$TMSD,
+        HRM = (HRM - d_mean$HRMM) / d_mean$HRMSD,
+        HRX = (HRX - d_mean$HRMM) / d_mean$HRMSD,
+        HRN = (HRN - d_mean$HRMM) / d_mean$HRMSD,
+        ) |>
+    ungroup()
+d_standarized
+```
+
+```{r}
+library(sf)
+library(ggmap)
+library(leaflet)
+library(tidyverse)
+
+estacions_sf <- sf::st_as_sf(estacions, coords = c("XUTM", "YUTM"),
+                             crs="+proj=utm +zone=31")
+
+mapview::mapview(estacions_sf, zcol="Altitud", label=c("Nom"), layer.name = "Altitude")
+```
+
+```{r}
+ggplot(d_standarized %>% filter(EMA == "DL"), aes(x=DATA)) +
+    geom_ribbon(aes(ymin = HRN, ymax=HRX), fill="blue", alpha=0.3) +
+    geom_line(aes(y = HRM), color="blue")
+
+```
+
+```{r}
+(d_year %>% filter(EMA == "ZB"))[1:20,]
+
+ggplot((d_year %>% filter(EMA == "ZB")), aes(x=DATA)) +
+    geom_ribbon(aes(ymin = HRN, ymax=HRX), fill="blue", alpha=0.3) +
+    geom_line(aes(y = HRM), color="blue")
+```
+
+```{r}
+d_standarized
+```
+
+```{r}
+d_standarized <- estacions %>% select(Codi, Altitud) %>% inner_join(d_standarized, by = c("Codi"="EMA"))
+```
+
+```{r}
+write_csv(d_standarized, "datasets/meteo/2015_standarized.csv")
+
+```

@@ -27,9 +27,10 @@ polr_functional <- function(data, labels) {
     data <- dd
     data <- data@MidP
     
-    df <- as_tibble(data) %>% mutate(y = labels)
-    
-    model <- MASS::polr(paste("y ~ ", paste(head(colnames(df), -1), collapse= "+")), df)
+    df <- as.data.frame(data) %>% mutate(y = labels)
+    fma <- as.formula(paste("y ~ ", paste(head(colnames(df), -1), collapse= "+")))
+
+    model <- MASS::polr(fma, df)
     new_model <- c("model" = list(model))
     class(new_model) <- "POLR_F"
     return(new_model)

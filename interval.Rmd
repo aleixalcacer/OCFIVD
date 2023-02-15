@@ -1,0 +1,181 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+
+
+df_data <- read_csv("datasets/meteo/2015_standarized.csv")
+df_data
+```
+
+```{r}
+source("methods/maint.R")
+source("methods/maint_fh.R")
+source("methods/kknn.R")
+source("methods/kpcao.R")
+source("methods/polr.R")
+source("methods/of.R")
+source("methods/kiof.R")
+
+data <- df_data %>% group_split(DATA)
+original_labels <- data[[1]] %>% pull(Altitud)
+
+meteo.Idata <- list()
+i <- 1
+for (day in data) {
+    day_i <- day |> select(-DATA, -Codi, -Altitud, -HRM, -TM) |> relocate(TN, TX, HRN, HRX)
+    day_i <- day_i |>
+        mutate(TN = TN - runif(length(TN), 0, 0.1)) |>
+        mutate(TX = TX + runif(length(TN), 0, 0.1)) |>
+        mutate(HRN = HRN - runif(length(TN), 0, 0.1)) |>
+        mutate(HRX = HRX + runif(length(TN), 0, 0.1))
+    i.IData <- MAINT.Data::IData(day_i, VarNames = paste(c("I1", "I2"), i, sep = ""))
+    meteo.Idata <- append(meteo.Idata, i.IData)
+    i <- i + 1
+}
+
+```
+
+```{r}
+
+max_len <- length(meteo.Idata)
+meteo_big.Idata <- meteo.Idata[seq(0, max_len, 2)]
+meteo_small.Idata <- meteo.Idata[seq(0, max_len, 30)]
+
+```
+
+
+```{r}
+meteo_big.Idata.dist <- readRDS("meteo_distances.rds")
+```
+
+```{r}
+meteo_big.Idata.dist <- interval_distance_functional(meteo_big.Idata, meteo_big.Idata)
+saveRDS(meteo_big.Idata.dist, "meteo_distances.rds")
+```
+
+Sols poden executar-se els que usen Kernels :)
+
+```{r}
+levels <- c(3:7)
+iterations <- c(1:50)
+methods <- c("MAINT", "OF", "MAINT + FH", "KIOF", "KKNN", "KPCAO")
+
+res <- array(0, dim = c(length(levels), length(iterations), length(methods)), dimnames = list(levels, iterations, methods))
+res_df = NULL
+```
+
+```{r}
+
+for (l in levels) {
+    print(l)
+    data <- df_data %>% group_split(DATA)
+    meteo.labels <- gtools::quantcut(original_labels, q=l, ordered = T)
+
+    n_levels <- length(levels(meteo.labels))
+    meteo.labels <- factor(as.numeric(meteo.labels), levels = 1:n_levels, order = T)
+    
+    for (i in iterations) {
+        train_id = sample.int(n = length(meteo.labels), size = floor(0.9 * length(meteo.labels)), replace = F)
+
+        split_data <- function(meteo.Idata, meteo.labels, train_id) {
+            train.IData = list()
+            test.IData = list()
+            for (day in meteo.Idata) {
+                train.IData = append(train.IData, day[train_id])
+                test.IData = append(test.IData, day[-train_id])
+            }
+            
+            return(list(train.IData = train.IData, test.IData=test.IData))
+        }
+        train.labels = meteo.labels[train_id]
+        test.labels = meteo.labels[-train_id]
+    
+        data_big = split_data(meteo_big.Idata, meteo.labels, train_id)
+        data_small = split_data(meteo_small.Idata, meteo.labels, train_id)
+        
+        print(i)
+        
+        print("Start KIOF")
+        method <- "KIOF"
+        model <- kiof_functional(meteo_big.Idata.dist[train_id, train_id],
+                                  train.labels)
+        model.res <- predict(model, meteo_big.Idata.dist[-train_id, train_id])
+        cm <- confusionMatrix(model.res, test.labels)
+        acc <- cm$overall["Accuracy"] 
+        res[as.character(l), as.character(i), method] <- acc
+        res_df <- bind_rows(res_df,
+                            tibble_row("method" = method, "level"=l,
+                                       "iteration"=i, "accuracy"=acc))
+        
+        
+        print("Start KKNN")
+        method <- "KKNN"
+        model <- kknn_functional(train.labels)
+        model.res <- predict(model, meteo_big.Idata.dist[train_id, -train_id])
+        cm <- confusionMatrix(model.res, test.labels)
+        acc <- cm$overall["Accuracy"] 
+        res[as.character(l), as.character(i), method] <- acc
+        res_df <- bind_rows(res_df,
+                            tibble_row("method" = method, "level"=l,
+                                       "iteration"=i, "accuracy"=acc))
+        
+        print("Start KPCAO")
+        method <- "KPCAO"
+        model <- kpcao_functional(meteo_big.Idata.dist[train_id, train_id],
+                                  train.labels)
+        model.res <- predict(model, meteo_big.Idata.dist[-train_id, train_id])
+        cm <- confusionMatrix(model.res, test.labels)
+        acc <- cm$overall["Accuracy"] 
+        res[as.character(l), as.character(i), method] <- acc
+        res_df <- bind_rows(res_df,
+                            tibble_row("method" = method, "level"=l,
+                                       "iteration"=i, "accuracy"=acc))
+              
+        print("Start MAINT + FH")
+        method <- "MAINT + FH"
+        model <- maint_fh_functional(data_small$train.IData, train.labels)
+        model.res <- predict(model, data_small$test.IData)
+        cm <- confusionMatrix(model.res, test.labels)
+        acc <- cm$overall["Accuracy"] 
+        res[as.character(l), as.character(i), method] <- acc
+        res_df <- bind_rows(res_df,
+                            tibble_row("method" = method, "level"=l,
+                                       "iteration"=i, "accuracy"=acc))
+        
+        print("Start OF")
+
+        method <- "OF"
+        model <- of_functional(data_small$train.IData, train.labels)
+        model.res <- predict(model, data_small$test.IData)
+        cm <- confusionMatrix(model.res, test.labels)
+        acc <- cm$overall["Accuracy"] 
+        res[as.character(l), as.character(i), method] <- acc
+        res_df <- bind_rows(res_df,
+                            tibble_row("method" = method, "level"=l,
+                                       "iteration"=i, "accuracy"=acc))
+              
+        print("Start MAINT")
+
+        method <- "MAINT"
+        model <- maint_functional(data_small$train.IData, train.labels)
+        model.res <- predict(model, data_small$test.IData)
+        cm <- confusionMatrix(model.res, test.labels)
+        acc <- cm$overall["Accuracy"] 
+        res[as.character(l), as.character(i), method] <- acc
+        res_df <- bind_rows(res_df,
+                            tibble_row("method" = method, "level"=l,
+                                       "iteration"=i, "accuracy"=acc))
+              
+    }
+}
+```
+```{r}
+saveRDS(res, "fun_results.rds")
+saveRDS(res_df, "fun_results_df.rds")
+```
+

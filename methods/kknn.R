@@ -112,15 +112,14 @@ predict.kknn <-  function (model, data, k = 7, kernel = "gaussian", distance = "
 
 
 
-kknn_functional <- function(data, labels) {
-    new_model <- c("train" = list(data), "labels" = list(labels))
+kknn_functional <- function(labels) {
+    new_model <- c("labels" = list(labels))
     class(new_model) <- "KKNN_F"
     return(new_model)
 }
 
 
-predict.KKNN_F <-  function (model, data, k = 7, kernel = "gaussian", distance = "euclidean_hausdorff") {
-    train <- model$train
+predict.KKNN_F <-  function (model, distances, k = 7, kernel = "triangular") {
     train_labels <- model$labels
     test <- data
     
@@ -137,10 +136,9 @@ predict.KKNN_F <-  function (model, data, k = 7, kernel = "gaussian", distance =
         result  
     }
     
-    m <- dim(train[[1]])[1]
-    p <- dim(test[[1]])[1]
-    q <- dim(train[[1]])[2]
-    
+    m <- dim(distances)[1]
+    p <- dim(distances)[2]
+
     kernel <- match.arg(kernel, c("rectangular", "triangular", "epanechnikov",
                                   "biweight", "triweight", "cos", "inv", 
                                   "gaussian"), FALSE)
@@ -148,7 +146,7 @@ predict.KKNN_F <-  function (model, data, k = 7, kernel = "gaussian", distance =
     cl <- train_labels
     lev <- levels(cl)
     
-    dist <- interval_distance_functional(train, test, distance = distance)
+    dist <- distances  # train vs test
     
     kdist <- as_tibble(dist) %>%
         rowid_to_column("a") %>%

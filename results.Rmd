@@ -5,45 +5,65 @@ output: html_notebook
 
 ```{r}
 library(tidyverse)
+library(ggpattern)
 ```
 
 ```{r}
-res_df <- readRDS("results_df.rds")
-res_df <- res_df %>% group_by(method, level) %>% summarise(mean=mean(accuracy), sd=sd(accuracy), .groups = "drop")
+res_df <- readRDS("fun_results_df.rds")
+res_df <- res_df %>%
+    group_by(method, level) %>% summarise(mean=mean(accuracy), sd=sd(accuracy), .groups = "drop") %>%
+    mutate(sampled = ifelse(method %in% c("MAINT", "OF", "MAINT + FH"), T, F))
 
-levels_prev <- c("MAINT", "POLR", "OF")
-levels_prop <- c("MAINT + FH", "KKNN", "KPCAO", "KIOF")
+res_df$method[res_df$method == "MAINT"] = "LDA-ID"
+res_df$method[res_df$method == "MAINT + FH"] = "FH + LDA-ID"
+res_df$method[res_df$method == "KKNN"] = "DI + wkNN"
+res_df$method[res_df$method == "KPCAO"] = "KPCA + POLR"
+res_df$method[res_df$method == "KIOF"] = "KIOF"
+res_df$method[res_df$method == "POLR_I"] = "POLR-I"
+res_df$method[res_df$method == "POLR_I2"] = "POLR-I2"
+
+levels_prev <- c("LDA-ID", "POLR", "OF")
+levels_prop <- c("FH + LDA-ID", "DI + wkNN", "KPCA + POLR", "KIOF", "POLR-I", "POLR-I2")
+levels_prev <- c("LDA-ID", "OF") # fun
+levels_prop <- c("FH + LDA-ID", "KIOF", "DI + wkNN", "KPCA + POLR") # fun
 
 levels <- c(levels_prev, levels_prop)
 
-p <- ggplot(res_df, aes(x = as.factor(level), y = mean, fill=factor(method, levels=levels))) +
+p <- ggplot(res_df, aes(x = as.factor(level), y = mean, pattern=sampled, fill=factor(method, levels=levels))) +
     # ylim(c(0, 1)) +
-    geom_bar(stat = "identity", position = "dodge") +
+    geom_col_pattern(stat = "identity", position = "dodge",
+                     pattern_fill    = 'white',
+                     colour  = 'black') +
       geom_errorbar(aes(ymin=mean+sd, ymax=mean-sd), width=.1,
                  position=position_dodge(.9))
 
-colors_prev <- rev(c("#132a13","#31572c","#4f772d","#90a955","#ecf39e"))
-colors_prop <- rev(c("#231942","#5e548e","#9f86c0","#be95c4","#e0b1cb"))
+colors_prev <- rev(c("#ff8800", "#ffa200","#ffb700", "#ffd000", "#ffea00"))
+colors_prop <- rev(c("#10002b", "#240046", "#3c096c", "#5a189a", "#7b2cbf", "#9d4edd", "#c77dff", "#e0aaff"))
 
 colors <- c(
     colors_prev[1:length(levels_prev)],
     colors_prop[1:length(levels_prop)]
     )
 
-p +
+p <- p +
     labs(
-        title = "Interval-data classification using ordinal labels",
         y = "Model accuracy",
         x = "Number of groups",
+        pattern = "Needs sampling?"
     ) +
     theme_classic() +
     scale_fill_manual(values=colors, name = "Model")
+
+p
+
+ggsave(p, file="plot_fun.eps", device="eps")
+
 ```
 
 
 ```{r}
 
-res_df <- readRDS("results_df.rds")
+res_df <- readRDS("fun_results_df.rds")
 
 # ggplot(res_df, aes(y = accuracy, fill=factor(method, levels=levels))) +
 ggplot(res_df, aes(y = accuracy, x = factor(method, levels=levels), fill=factor(method, levels=levels))) +

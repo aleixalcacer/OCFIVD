@@ -29,27 +29,25 @@ predict.KIOF <- function(model, test) {
 }
 
 
-kiof_functional <- function(train, labels, distance = "hausdorff") {
+kiof_functional <- function(distances, labels) {
     #----------------
-    Mdist <- interval_distance_functional(train, train, distance)
+    Mdist <- distances # train vs train
     #------------- ---
-    gamma <- 1
-    K <- exp(-Mdist^2/gamma)
+    K <- 1 - Mdist
     #----------------
     et  <- labels
     db  <- data.frame(et=et, kk=K)
     ordforres <- ordfor(depvar="et", data=db)
-    new_model <- c("model"=list(ordforres), "distance"=list(distance), "data"=list(train))
+    new_model <- c("model"=list(ordforres))
     class(new_model) <- "KIOF_F"
     return(new_model)
 }
 
 
-predict.KIOF_F <- function(model, test) {
+predict.KIOF_F <- function(model, distances) {
     
-    test_dist <- interval_distance_functional(test, model$data, distance = model$distance)
-    gamma <- 1
-    test_ker <- exp(-test_dist^2/gamma)
+    test_dist <- distances  # test vs train
+    test_ker <- 1 - test_dist
     db <- data.frame( kk=test_ker)
     a  <- predict(model$model,db)
     return(a$ypred)

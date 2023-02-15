@@ -28,9 +28,9 @@ predict.kpcao <- function(model, test) {
     return(predict(model$model, test_polr_df))
 }
 
-kpcao_functional <- function(train, labels, distance = "ichino_yaguchi") {
+kpcao_functional <- function(distances, labels) {
     
-    dist <- interval_distance_functional(train, train, distance)
+    dist <- distances # train train
     
     ker <- kernlab::as.kernelMatrix(1 - dist)
     
@@ -40,15 +40,15 @@ kpcao_functional <- function(train, labels, distance = "ichino_yaguchi") {
     polr_df <- as_tibble(pca_rotated) %>% mutate(y = labels)
     
     model <- MASS::polr(y ~ V1 + V2 + V3 + V4 + V5 + V6, data=polr_df)
-    new_model <- c("model"=list(model), "pca"=list(pca), "distance"=list(distance), "data"=list(train))
+    new_model <- c("model"=list(model), "pca"=list(pca))
     
     class(new_model) <- "KPCAO_F"
     return(new_model)
 }
 
 
-predict.KPCAO_F <- function(model, test) {
-    test_dist <- interval_distance_functional(test, model$data, distance = model$distance)
+predict.KPCAO_F <- function(model, distances) {
+    test_dist <- distances # test train
     test_ker <- kernlab::as.kernelMatrix(1 - test_dist)
     test_pca_rotated <- predict(model$pca, test_ker)
     test_polr_df <- as.tibble(test_pca_rotated)
